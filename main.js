@@ -277,7 +277,8 @@ class App {
       'specificObjectiveSelected',
       'taskSelected',
       'stateChange',
-      'attachmentsUpdated'
+      'attachmentsUpdated',
+      'checklistUpdated'
     ];
 
     selectionEvents.forEach(event => {
@@ -305,6 +306,9 @@ class App {
 
       const attachments = await apiService.fetchAllAttachments();
       stateManager.updateAttachments(attachments);
+
+      const checklistItems = await apiService.fetchAllChecklistItems();
+      stateManager.updateChecklistItems(checklistItems);
     } catch (error) {
       console.error('Error loading initial data:', error);
     }
@@ -464,6 +468,7 @@ class App {
 
     const hasSections = sections.filter(Boolean).length > 0;
     const attachments = this.renderAttachmentsSection(type, item);
+    const checklist = type === 'task' ? this.renderChecklistSection(item) : '';
 
     return `
       <div class="card" style="cursor: default;">
@@ -476,6 +481,7 @@ class App {
         </div>
         ${hasSections ? sections.join('') : '<p style="color: var(--text-secondary); font-size: 0.875rem;">Aucun detail disponible pour cet element.</p>'}
         ${attachments}
+        ${checklist}
       </div>
     `;
   }
@@ -483,6 +489,7 @@ class App {
   bindDetailEvents(selection) {
     if (!selection) return;
     this.bindAttachmentEvents(selection);
+    this.bindChecklistEvents(selection);
   }
 
   renderAttachmentsSection(type, item) {
@@ -607,6 +614,158 @@ class App {
     try {
       await apiService.deleteAttachment(attachmentId);
       stateManager.deleteAttachment(attachmentId);
+    } catch (error) {
+      if (errorEl) {
+        errorEl.textContent = 'Erreur lors de la suppression: ' + error.message;
+      }
+    }
+  }
+
+  renderChecklistSection(task) {
+    const checklistItems = stateManager.getState('checklistItems')
+      .filter(item => item.task_id === task.id);
+
+    const listContent = checklistItems.length === 0
+      ? '<p style="color: var(--text-secondary); font-size: 0.875rem;">Aucun test dans la liste de controle.</p>'
+      : checklistItems.map(item => `
+        <div class="checklist-item" data-id="${item.id}" style="display: flex; align-items: flex-start; justify-content: space-between; padding: 8px; background: var(--bg-secondary); border-radius: var(--border-radius-sm); gap: 12px;">
+          <label style="display: flex; gap: 8px; align-items: flex-start; flex: 1; cursor: pointer;">
+            <input type="checkbox" data-id="${item.id}" ${item.is_completed ? 'checked' : ''} style="margin-top: 4px;" />
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-weight: 600;">${item.title}</span>
+                ${item.pdac_phase ? `<span class="status-badge" style="background: var(--bg-tertiary); color: var(--text-secondary);">${item.pdac_phase}</span>` : ''}
+              </div>
+              ${item.description ? `<p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem;">${item.description}</p>` : ''}
+            </div>
+          </label>
+          <button class="btn-danger" data-action="delete-checklist" data-id="${item.id}" style="padding: 4px 8px; font-size: 0.75rem;">Supprimer</button>
+        </div>
+      `).join('');
+
+    return `
+      <div class="checklist-section" data-task-id="${task.id}" style="margin-top: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px;">
+          <div>
+            <h4 style="margin: 0; font-size: 0.95rem;">Liste de controle (PDCA)</h4>
+            <p style="margin: 2px 0 0; color: var(--text-secondary); font-size: 0.85rem;">Ajoutez vos tests de verification et cochez ceux qui sont OK.</p>
+          </div>
+        </div>
+        <div id="checklist-list-${task.id}" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">${listContent}</div>
+        <div class="checklist-form" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-top: 8px; align-items: end;">
+          <div class="form-group" style="margin: 0;">
+            <label style="margin-bottom: 4px; display: block;">Intitulé du test *</label>
+            <input type="text" data-input="checklist-title" placeholder="Ex: Tester le flux utilisateur" />
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label style="margin-bottom: 4px; display: block;">Phase PDCA</label>
+            <select data-input="checklist-phase">
+              <option value="Plan">Plan</option>
+              <option value="Do">Do</option>
+              <option value="Check">Check</option>
+              <option value="Act">Act</option>
+            </select>
+          </div>
+          <button class="btn-primary" data-action="add-checklist" style="height: 38px;">+ Ajouter</button>
+        </div>
+        <div class="form-group" style="margin: 8px 0 0;">
+          <label style="margin-bottom: 4px; display: block;">Description (optionnel)</label>
+          <textarea data-input="checklist-description" rows="2" placeholder="Precisez le critere d'acceptation ou les donnees de test"></textarea>
+        </div>
+        <div class="checklist-error" style="color: var(--error-color); font-size: 0.85rem; margin-top: 6px;"></div>
+      </div>
+    `;
+  }
+
+  bindChecklistEvents(selection) {
+    if (selection.type !== 'task') return;
+
+    const section = document.querySelector('.checklist-section');
+    if (!section) return;
+
+    const taskId = section.dataset.taskId;
+    const addButton = section.querySelector('[data-action="add-checklist"]');
+    if (addButton) {
+      addButton.addEventListener('click', () => this.handleAddChecklistItem(taskId));
+    }
+
+    const deleteButtons = section.querySelectorAll('[data-action="delete-checklist"]');
+    deleteButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const itemId = btn.dataset.id;
+        this.handleDeleteChecklistItem(itemId);
+      });
+    });
+
+    const toggles = section.querySelectorAll('input[type="checkbox"][data-id]');
+    toggles.forEach(toggle => {
+      toggle.addEventListener('change', (e) => {
+        const itemId = toggle.dataset.id;
+        this.handleToggleChecklistItem(itemId, e.target.checked);
+      });
+    });
+  }
+
+  async handleAddChecklistItem(taskId) {
+    const section = document.querySelector('.checklist-section');
+    if (!section) return;
+
+    const titleInput = section.querySelector('[data-input="checklist-title"]');
+    const phaseSelect = section.querySelector('[data-input="checklist-phase"]');
+    const descriptionInput = section.querySelector('[data-input="checklist-description"]');
+    const errorEl = section.querySelector('.checklist-error');
+
+    const title = titleInput?.value.trim();
+    const pdacPhase = phaseSelect?.value || 'Plan';
+    const description = descriptionInput?.value.trim();
+
+    if (!title) {
+      errorEl.textContent = 'Le nom du test est requis pour l\'ajout.';
+      return;
+    }
+
+    const existingItems = stateManager.getState('checklistItems')
+      .filter(item => item.task_id === taskId);
+
+    try {
+      const newItem = await apiService.createChecklistItem({
+        task_id: taskId,
+        title,
+        description: description || '',
+        pdac_phase: pdacPhase,
+        is_completed: false,
+        order_index: existingItems.length + 1
+      });
+
+      stateManager.addChecklistItem(newItem);
+      if (titleInput) titleInput.value = '';
+      if (descriptionInput) descriptionInput.value = '';
+      if (phaseSelect) phaseSelect.value = 'Plan';
+      errorEl.textContent = '';
+    } catch (error) {
+      errorEl.textContent = 'Erreur lors de l\'ajout: ' + error.message;
+    }
+  }
+
+  async handleToggleChecklistItem(itemId, isCompleted) {
+    const section = document.querySelector('.checklist-section');
+    const errorEl = section?.querySelector('.checklist-error');
+    try {
+      const updated = await apiService.updateChecklistItem(itemId, { is_completed: isCompleted });
+      stateManager.updateChecklistItem(updated);
+    } catch (error) {
+      if (errorEl) {
+        errorEl.textContent = 'Erreur lors de la mise à jour: ' + error.message;
+      }
+    }
+  }
+
+  async handleDeleteChecklistItem(itemId) {
+    const section = document.querySelector('.checklist-section');
+    const errorEl = section?.querySelector('.checklist-error');
+    try {
+      await apiService.deleteChecklistItem(itemId);
+      stateManager.deleteChecklistItem(itemId);
     } catch (error) {
       if (errorEl) {
         errorEl.textContent = 'Erreur lors de la suppression: ' + error.message;
