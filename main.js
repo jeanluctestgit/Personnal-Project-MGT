@@ -24,6 +24,7 @@ class App {
     this.setupAuth();
     this.setupNavigation();
     this.setupComponents();
+    this.setupDetailPanel();
     await this.checkAuth();
   }
 
@@ -246,6 +247,20 @@ class App {
     this.components.kpiDashboard = new KPIDashboard();
   }
 
+  setupDetailPanel() {
+    const selectionEvents = [
+      'projectSelected',
+      'globalObjectiveSelected',
+      'specificObjectiveSelected',
+      'taskSelected',
+      'stateChange'
+    ];
+
+    selectionEvents.forEach(event => {
+      stateManager.subscribe(event, () => this.renderSelectionDetails());
+    });
+  }
+
   async loadInitialData() {
     try {
       const projects = await apiService.fetchProjects();
@@ -280,6 +295,7 @@ class App {
       case 'tree':
         listPanel.style.display = 'block';
         viewContainer.innerHTML = '<div class="empty-state"><p>Selectionnez un element dans l\'arbre pour voir les details.</p></div>';
+        this.renderSelectionDetails();
         break;
 
       case 'kanban':
@@ -341,6 +357,158 @@ class App {
       this.components.calendarTasks.items = tasks;
       this.components.calendarTasks.renderCalendar();
     }
+  }
+
+  renderSelectionDetails() {
+    if (this.currentView !== 'tree') return;
+
+    const viewContainer = document.getElementById('view-container');
+    const selection = this.getCurrentSelection();
+
+    if (!selection) {
+      viewContainer.innerHTML = '<div class="empty-state"><p>Selectionnez un element dans l\'arbre pour voir les details.</p></div>';
+      return;
+    }
+
+    viewContainer.innerHTML = this.buildDetailMarkup(selection);
+  }
+
+  getCurrentSelection() {
+    const state = stateManager.getState();
+
+    if (state.selectedTask) {
+      return { type: 'task', item: state.selectedTask };
+    }
+    if (state.selectedSpecificObjective) {
+      return { type: 'specificObjective', item: state.selectedSpecificObjective };
+    }
+    if (state.selectedGlobalObjective) {
+      return { type: 'globalObjective', item: state.selectedGlobalObjective };
+    }
+    if (state.selectedProject) {
+      return { type: 'project', item: state.selectedProject };
+    }
+
+    return null;
+  }
+
+  buildDetailMarkup(selection) {
+    const { type, item } = selection;
+    const title = this.getSelectionTitle(type);
+    const sections = [];
+
+    if (item.description) {
+      sections.push(this.renderTextBlock('Description', item.description));
+    }
+
+    if (type === 'project') {
+      if (item.business_context) {
+        sections.push(this.renderTextBlock('Contexte business', item.business_context));
+      }
+      if (item.target_audience) {
+        sections.push(this.renderTextBlock('Cible', item.target_audience));
+      }
+    }
+
+    if (type === 'globalObjective' || type === 'specificObjective') {
+      sections.push(this.renderDetailItem('Statut', this.formatStatus(item.status)));
+      if (item.smart_criteria) {
+        sections.push(this.renderSmartCriteria(item.smart_criteria));
+      }
+    }
+
+    if (type === 'task') {
+      sections.push(this.renderDetailItem('Type', item.type === 'subproject' ? 'Sous-projet' : 'Tache'));
+      sections.push(this.renderDetailItem('Statut', this.formatStatus(item.status)));
+      if (item.priority) {
+        sections.push(this.renderDetailItem('Priorite', item.priority));
+      }
+      if (item.completion_percentage !== undefined && item.completion_percentage !== null) {
+        sections.push(this.renderDetailItem('Progression', `${item.completion_percentage}%`));
+      }
+      if (item.start_date || item.end_date) {
+        sections.push(this.renderDetailItem('Dates', `${item.start_date || 'N/A'} → ${item.end_date || 'N/A'}`));
+      }
+      if (item.context) {
+        sections.push(this.renderTextBlock('Contexte', item.context));
+      }
+    }
+
+    const hasSections = sections.filter(Boolean).length > 0;
+
+    return `
+      <div class="card" style="cursor: default;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px;">
+          <div>
+            <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">${title}</p>
+            <h2 style="margin: 4px 0 0;">${item.name || 'Sans titre'}</h2>
+          </div>
+          ${item.status ? `<span class="status-badge" style="background-color: var(--bg-secondary); color: var(--text-secondary);">${this.formatStatus(item.status)}</span>` : ''}
+        </div>
+        ${hasSections ? sections.join('') : '<p style="color: var(--text-secondary); font-size: 0.875rem;">Aucun detail disponible pour cet element.</p>'}
+      </div>
+    `;
+  }
+
+  renderTextBlock(title, content) {
+    if (!content) return '';
+    return `
+      <div style="margin-bottom: 12px;">
+        <h4 style="margin: 0 0 4px; font-size: 0.95rem;">${title}</h4>
+        <p style="margin: 0; color: var(--text-secondary);">${content}</p>
+      </div>
+    `;
+  }
+
+  renderDetailItem(label, value) {
+    if (value === undefined || value === null || value === '') return '';
+    return `
+      <div class="detail-item" style="padding: 4px 0;">
+        <span class="detail-label">${label}</span>
+        <span class="detail-value">${value}</span>
+      </div>
+    `;
+  }
+
+  renderSmartCriteria(criteria) {
+    const entries = Object.entries(criteria)
+      .filter(([, value]) => Boolean(value))
+      .map(([key, value]) => this.renderTextBlock(key.toUpperCase(), value));
+
+    if (entries.length === 0) return '';
+
+    return `
+      <div style="margin-top: 12px;">
+        <h4 style="margin: 0 0 6px; font-size: 0.95rem;">Critères SMART</h4>
+        ${entries.join('')}
+      </div>
+    `;
+  }
+
+  getSelectionTitle(type) {
+    switch(type) {
+      case 'project':
+        return 'Projet selectionne';
+      case 'globalObjective':
+        return 'Objectif global selectionne';
+      case 'specificObjective':
+        return 'Objectif specifique selectionne';
+      case 'task':
+        return 'Tache selectionnee';
+      default:
+        return 'Element selectionne';
+    }
+  }
+
+  formatStatus(status) {
+    const labels = {
+      not_started: 'Non demarre',
+      in_progress: 'En cours',
+      completed: 'Termine',
+      blocked: 'Bloque'
+    };
+
+    return labels[status] || status || 'Non defini';
   }
 }
 
