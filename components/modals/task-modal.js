@@ -33,6 +33,7 @@ export class TaskModal {
   render() {
     const hrResources = this.stateManager.getState('hrResources');
     const taskType = this.task?.type || 'task';
+    const status = this.task?.status || 'not_started';
 
     const modalContainer = document.getElementById('modal-container');
     modalContainer.style.display = 'block';
@@ -86,6 +87,15 @@ export class TaskModal {
                 <label>% Realisation</label>
                 <input type="number" id="task-completion" value="${this.task?.completion_percentage || 0}" min="0" max="100" />
               </div>
+            </div>
+            <div class="form-group">
+              <label>Statut</label>
+              <select id="task-status">
+                <option value="not_started" ${status === 'not_started' ? 'selected' : ''}>À faire</option>
+                <option value="in_progress" ${status === 'in_progress' ? 'selected' : ''}>En cours</option>
+                <option value="completed" ${status === 'completed' ? 'selected' : ''}>Terminé</option>
+                <option value="blocked" ${status === 'blocked' ? 'selected' : ''}>Bloqué</option>
+              </select>
             </div>
             <div class="form-group">
               <label>Assigne a (HR)</label>
@@ -212,6 +222,7 @@ export class TaskModal {
     const duration = parseInt(document.getElementById('task-duration').value) || 0;
     const priority = parseInt(document.getElementById('task-priority').value) || 0;
     const completion = parseInt(document.getElementById('task-completion').value) || 0;
+    const status = document.getElementById('task-status').value || 'not_started';
     const assignedTo = document.getElementById('task-assigned').value || null;
     const errorDiv = document.getElementById('error-message');
 
@@ -230,6 +241,7 @@ export class TaskModal {
       duration,
       priority,
       completion_percentage: completion,
+      status,
       assigned_to: assignedTo,
       specific_objective_id: this.specificObjectiveId || this.task.specific_objective_id
     };
