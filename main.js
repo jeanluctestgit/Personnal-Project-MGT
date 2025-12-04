@@ -63,6 +63,7 @@ class App {
     stateManager.updateGlobalObjectives([]);
     stateManager.updateSpecificObjectives([]);
     stateManager.updateTasks([]);
+    stateManager.updateHRResources([]);
     this.updateAuthButton();
   }
 
@@ -124,11 +125,9 @@ class App {
         throw new Error('Email et mot de passe requis');
       }
 
-      this.currentUser = {
-        id: this.generateId('user'),
-        email
-      };
+      const user = await apiService.authenticateUser(email, password);
 
+      this.currentUser = user;
       localStorage.setItem('ppm_local_user', JSON.stringify(this.currentUser));
       stateManager.setState({ currentUser: this.currentUser });
       await this.loadInitialData();
@@ -152,11 +151,9 @@ class App {
         throw new Error('Email et mot de passe requis');
       }
 
-      this.currentUser = {
-        id: this.generateId('user'),
-        email
-      };
+      const user = await apiService.registerUser(email, password);
 
+      this.currentUser = user;
       localStorage.setItem('ppm_local_user', JSON.stringify(this.currentUser));
       stateManager.setState({ currentUser: this.currentUser });
       await this.loadInitialData();
@@ -236,10 +233,12 @@ class App {
         const globalObjectives = await apiService.fetchGlobalObjectives();
         const specificObjectives = await apiService.fetchSpecificObjectives();
         const tasks = await apiService.fetchTasks();
+        const hrResources = await apiService.fetchHRResources();
 
         stateManager.updateGlobalObjectives(globalObjectives);
         stateManager.updateSpecificObjectives(specificObjectives);
         stateManager.updateTasks(tasks);
+        stateManager.updateHRResources(hrResources);
       }
     } catch (error) {
       console.error('Error loading initial data:', error);
