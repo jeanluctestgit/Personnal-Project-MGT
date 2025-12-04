@@ -193,6 +193,12 @@ export class KPIDashboard {
         total: resources.length,
         active: activeResources,
         totalAllocatedHours
+      },
+      details: {
+        tasks: allTasks,
+        globalObjectives,
+        specificObjectives,
+        resources
       }
     };
   }
@@ -249,23 +255,23 @@ export class KPIDashboard {
       <div class="kpi-charts-container">
         <div class="kpi-chart-card">
           <h3>État des Tâches</h3>
-          <div class="chart-bars">
-            ${this.renderStatusBar('Terminé', tasks.completed, tasks.total, '#10b981')}
-            ${this.renderStatusBar('En Cours', tasks.inProgress, tasks.total, '#f59e0b')}
-            ${this.renderStatusBar('À Faire', tasks.notStarted, tasks.total, '#64748b')}
-            ${this.renderStatusBar('Bloqué', tasks.blocked, tasks.total, '#ef4444')}
+          <div class="chart-canvas-container">
+            <canvas id="kpiStatusChart" aria-label="Répartition des statuts des tâches"></canvas>
           </div>
         </div>
 
         <div class="kpi-chart-card">
           <h3>Progression Générale</h3>
-          <div class="progress-circle-container">
-            <div class="progress-circle" style="--progress: ${tasks.avgCompletion}">
-              <div class="progress-circle-inner">
-                <span class="progress-circle-value">${tasks.avgCompletion}%</span>
-                <span class="progress-circle-label">Complété</span>
-              </div>
-            </div>
+          <div class="chart-canvas-container">
+            <canvas id="kpiCompletionChart" aria-label="Taux d'achèvement moyen"></canvas>
+          </div>
+        </div>
+
+        <div class="kpi-chart-card">
+          <h3>Charge par Ressource</h3>
+          <div class="chart-canvas-container">
+            <div id="resourceChartEmpty" class="chart-placeholder">Aucune assignation de ressource</div>
+            <canvas id="kpiResourceChart" aria-label="Heures allouées par ressource"></canvas>
           </div>
         </div>
       </div>
@@ -335,19 +341,187 @@ export class KPIDashboard {
         </table>
       </div>
     `;
+
+    this.renderCharts();
   }
 
-  renderStatusBar(label, value, total, color) {
-    const percentage = total > 0 ? (value / total) * 100 : 0;
-    return `
-      <div class="chart-bar-row">
-        <div class="chart-bar-label">${label}</div>
-        <div class="chart-bar">
-          <div class="chart-bar-fill" style="width: ${percentage}%; background-color: ${color};"></div>
-        </div>
-        <div class="chart-bar-value">${value}</div>
-      </div>
-    `;
+  renderCharts() {
+    if (!this.kpiData) return;
+
+    this.renderStatusChart();
+    this.renderCompletionChart();
+    this.renderResourceChart();
+  }
+
+  renderStatusChart() {
+    const statusCanvas = document.getElementById('kpiStatusChart');
+    if (!statusCanvas) return;
+
+    const { tasks } = this.kpiData;
+
+    const canvasContext = this.prepareCanvas(statusCanvas);
+    if (!canvasContext) return;
+    const { ctx, width, height } = canvasContext;
+
+    const values = [tasks.completed, tasks.inProgress, tasks.notStarted, tasks.blocked];
+    const colors = ['#10b981', '#f59e0b', '#94a3b8', '#ef4444'];
+    const total = values.reduce((sum, v) => sum + v, 0) || 1;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = Math.min(width, height) / 2 - 12;
+    let startAngle = -Math.PI / 2;
+
+    values.forEach((value, index) => {
+      const angle = (value / total) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.fillStyle = colors[index];
+      ctx.arc(centerX, centerY, radius, startAngle, startAngle + angle);
+      ctx.closePath();
+      ctx.fill();
+      startAngle += angle;
+    });
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 18px Inter, system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${tasks.total} tâches`, centerX, centerY - 6);
+    ctx.font = '12px Inter, system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#475569';
+    ctx.fillText('réparties par statut', centerX, centerY + 14);
+  }
+
+  renderCompletionChart() {
+    const completionCanvas = document.getElementById('kpiCompletionChart');
+    if (!completionCanvas) return;
+
+    const { tasks, objectives } = this.kpiData;
+    const completionValue = Math.min(100, Math.max(0, tasks.avgCompletion));
+    const remaining = Math.max(0, 100 - completionValue);
+
+    const canvasContext = this.prepareCanvas(completionCanvas);
+    if (!canvasContext) return;
+    const { ctx, width, height } = canvasContext;
+
+    const values = [completionValue, remaining];
+    const colors = ['#6366f1', '#e2e8f0'];
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const outerRadius = Math.min(width, height) / 2 - 12;
+    const innerRadius = outerRadius * 0.65;
+    let startAngle = -Math.PI / 2;
+
+    values.forEach((value, index) => {
+      const angle = (value / 100) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.strokeStyle = colors[index];
+      ctx.lineWidth = outerRadius - innerRadius;
+      ctx.arc(centerX, centerY, (outerRadius + innerRadius) / 2, startAngle, startAngle + angle);
+      ctx.stroke();
+      startAngle += angle;
+    });
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 26px Inter, system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${completionValue}%`, centerX, centerY - 8);
+
+    ctx.font = '14px Inter, system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#475569';
+    ctx.fillText(`Objectifs: ${objectives.specificCompleted}/${objectives.specific}`, centerX, centerY + 14);
+  }
+
+  renderResourceChart() {
+    const resourceCanvas = document.getElementById('kpiResourceChart');
+    const emptyState = document.getElementById('resourceChartEmpty');
+    if (!resourceCanvas || !this.kpiData?.details) return;
+
+    const { tasks, resources } = this.kpiData.details;
+
+    const allocations = resources.map(resource => {
+      const hours = tasks.reduce((sum, task) => {
+        const assignments = task.task_assignments || [];
+        const resourceAssignments = assignments.filter(a => a.resource_id === resource.id);
+        return sum + resourceAssignments.reduce((taskSum, assignment) => taskSum + (assignment.allocated_hours || 0), 0);
+      }, 0);
+
+      return {
+        name: resource.name,
+        hours,
+        capacity: resource.capacity_hours_per_week || 0
+      };
+    }).filter(entry => entry.hours > 0 || entry.capacity > 0);
+
+    if (!allocations.length) {
+      if (emptyState) emptyState.style.display = 'flex';
+      resourceCanvas.style.display = 'none';
+      return;
+    }
+
+    if (emptyState) emptyState.style.display = 'none';
+    resourceCanvas.style.display = 'block';
+
+    const labels = allocations.map(a => a.name);
+    const hoursData = allocations.map(a => a.hours);
+    const capacityData = allocations.map(a => a.capacity);
+
+    const canvasContext = this.prepareCanvas(resourceCanvas, { height: 280 });
+    if (!canvasContext) return;
+    const { ctx, width, height } = canvasContext;
+
+    const padding = 48;
+    const availableWidth = width - padding * 2;
+    const barWidth = availableWidth / (labels.length * 2.2);
+    const maxValue = Math.max(...hoursData, ...capacityData, 1);
+    const chartHeight = height - padding * 2;
+
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padding, padding / 1.5);
+    ctx.lineTo(padding, height - padding / 1.5);
+    ctx.lineTo(width - padding / 2, height - padding / 1.5);
+    ctx.stroke();
+
+    labels.forEach((label, index) => {
+      const xBase = padding + index * (barWidth * 2.2);
+      const hoursHeight = (hoursData[index] / maxValue) * chartHeight;
+      const capacityHeight = (capacityData[index] / maxValue) * chartHeight;
+
+      ctx.fillStyle = '#6366f1';
+      ctx.fillRect(xBase, height - padding / 1.5 - hoursHeight, barWidth, hoursHeight);
+
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(xBase + barWidth + 6, height - padding / 1.5 - capacityHeight, barWidth, capacityHeight);
+
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '12px Inter, system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, xBase + barWidth, height - padding / 3);
+    });
+  }
+
+  prepareCanvas(canvas, { height, minHeight } = {}) {
+    if (!canvas) return null;
+
+    const parent = canvas.parentElement;
+    const targetWidth = parent?.clientWidth || 320;
+    const targetHeight = height || Math.max(minHeight || 260, parent?.clientHeight || 0);
+    const ratio = window.devicePixelRatio || 1;
+
+    canvas.width = targetWidth * ratio;
+    canvas.height = targetHeight * ratio;
+    canvas.style.width = `${targetWidth}px`;
+    canvas.style.height = `${targetHeight}px`;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.clearRect(0, 0, targetWidth, targetHeight);
+    return { ctx, width: targetWidth, height: targetHeight };
   }
 
   formatDate(date) {
