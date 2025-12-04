@@ -276,7 +276,8 @@ class App {
       'globalObjectiveSelected',
       'specificObjectiveSelected',
       'taskSelected',
-      'stateChange'
+      'stateChange',
+      'attachmentsUpdated'
     ];
 
     selectionEvents.forEach(event => {
@@ -301,6 +302,9 @@ class App {
         stateManager.updateTasks(tasks);
         stateManager.updateHRResources(hrResources);
       }
+
+      const attachments = await apiService.fetchAllAttachments();
+      stateManager.updateAttachments(attachments);
     } catch (error) {
       console.error('Error loading initial data:', error);
     }
@@ -394,6 +398,7 @@ class App {
     }
 
     viewContainer.innerHTML = this.buildDetailMarkup(selection);
+    this.bindDetailEvents(selection);
   }
 
   getCurrentSelection() {
@@ -458,6 +463,7 @@ class App {
     }
 
     const hasSections = sections.filter(Boolean).length > 0;
+    const attachments = this.renderAttachmentsSection(type, item);
 
     return `
       <div class="card" style="cursor: default;">
@@ -469,8 +475,158 @@ class App {
           ${item.status ? `<span class="status-badge" style="background-color: var(--bg-secondary); color: var(--text-secondary);">${this.formatStatus(item.status)}</span>` : ''}
         </div>
         ${hasSections ? sections.join('') : '<p style="color: var(--text-secondary); font-size: 0.875rem;">Aucun detail disponible pour cet element.</p>'}
+        ${attachments}
       </div>
     `;
+  }
+
+  bindDetailEvents(selection) {
+    if (!selection) return;
+    this.bindAttachmentEvents(selection);
+  }
+
+  renderAttachmentsSection(type, item) {
+    const entityType = this.getAttachmentEntityType(type);
+    if (!entityType || !item?.id) return '';
+
+    const attachments = stateManager.getState('attachments')
+      .filter(att => att.entity_type === entityType && att.entity_id === item.id);
+
+    const listContent = attachments.length === 0
+      ? '<p style="color: var(--text-secondary); font-size: 0.875rem;">Aucune pièce jointe sur Google Drive.</p>'
+      : attachments.map(att => `
+        <div class="attachment-item" data-attachment-id="${att.id}" style="display: flex; align-items: center; justify-content: space-between; padding: 8px; background: var(--bg-secondary); border-radius: var(--border-radius-sm); margin-bottom: 6px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <a href="${att.drive_url || att.drive_file_id || '#'}" target="_blank" rel="noopener" style="color: var(--primary-color); font-weight: 600; text-decoration: none;">${att.file_name || 'Lien Drive'}</a>
+            ${att.drive_file_id ? `<span style="color: var(--text-secondary); font-size: 0.75rem;">ID Drive: ${att.drive_file_id}</span>` : ''}
+          </div>
+          <button class="btn-danger" data-action="remove-attachment" data-id="${att.id}" style="padding: 4px 8px; font-size: 0.75rem;">Supprimer</button>
+        </div>
+      `).join('');
+
+    return `
+      <div class="attachments-section" data-entity-type="${entityType}" data-entity-id="${item.id}" style="margin-top: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px;">
+          <div>
+            <h4 style="margin: 0; font-size: 0.95rem;">Pièces jointes (Google Drive)</h4>
+            <p style="margin: 2px 0 0; color: var(--text-secondary); font-size: 0.85rem;">Ajoutez des liens vers vos fichiers Drive (docs, feuilles, dossiers...).</p>
+          </div>
+        </div>
+        <div id="attachment-list-${item.id}">${listContent}</div>
+        <div class="attachment-form" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-top: 8px; align-items: end;">
+          <div class="form-group" style="margin: 0;">
+            <label style="margin-bottom: 4px; display: block;">Nom du fichier</label>
+            <input type="text" data-input="attachment-name" placeholder="Ex: Cahier des charges" />
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label style="margin-bottom: 4px; display: block;">Lien Google Drive *</label>
+            <input type="url" data-input="attachment-url" placeholder="https://drive.google.com/..." />
+          </div>
+          <button class="btn-primary" data-action="add-attachment" style="height: 38px;">+ Ajouter</button>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+          <div class="form-group" style="margin: 0;">
+            <label style="margin-bottom: 4px; display: block;">ID du fichier (optionnel)</label>
+            <input type="text" data-input="attachment-id" placeholder="1AbC..." />
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label style="margin-bottom: 4px; display: block;">Description (optionnel)</label>
+            <input type="text" data-input="attachment-description" placeholder="Notes internes" />
+          </div>
+        </div>
+        <div class="attachment-error" style="color: var(--error-color); font-size: 0.85rem; margin-top: 6px;"></div>
+      </div>
+    `;
+  }
+
+  bindAttachmentEvents(selection) {
+    const section = document.querySelector('.attachments-section');
+    if (!section) return;
+
+    const entityType = section.dataset.entityType;
+    const entityId = section.dataset.entityId;
+
+    const addButton = section.querySelector('[data-action="add-attachment"]');
+    if (addButton) {
+      addButton.addEventListener('click', () => this.handleAddAttachment(entityType, entityId));
+    }
+
+    const removeButtons = section.querySelectorAll('[data-action="remove-attachment"]');
+    removeButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const attachmentId = btn.dataset.id;
+        this.handleDeleteAttachment(attachmentId);
+      });
+    });
+  }
+
+  async handleAddAttachment(entityType, entityId) {
+    const section = document.querySelector('.attachments-section');
+    if (!section) return;
+
+    const nameInput = section.querySelector('[data-input="attachment-name"]');
+    const urlInput = section.querySelector('[data-input="attachment-url"]');
+    const driveIdInput = section.querySelector('[data-input="attachment-id"]');
+    const descriptionInput = section.querySelector('[data-input="attachment-description"]');
+    const errorEl = section.querySelector('.attachment-error');
+
+    const fileName = nameInput?.value.trim() || 'Lien Drive';
+    const driveUrl = urlInput?.value.trim();
+    const driveFileId = driveIdInput?.value.trim();
+    const description = descriptionInput?.value.trim();
+
+    if (!driveUrl) {
+      errorEl.textContent = 'Le lien Google Drive est requis pour ajouter une pièce jointe.';
+      return;
+    }
+
+    try {
+      const attachment = await apiService.createAttachment({
+        entity_type: entityType,
+        entity_id: entityId,
+        file_name: fileName,
+        drive_url: driveUrl,
+        drive_file_id: driveFileId || null,
+        description: description || ''
+      });
+
+      stateManager.addAttachment(attachment);
+      if (nameInput) nameInput.value = '';
+      if (urlInput) urlInput.value = '';
+      if (driveIdInput) driveIdInput.value = '';
+      if (descriptionInput) descriptionInput.value = '';
+      errorEl.textContent = '';
+    } catch (error) {
+      errorEl.textContent = 'Erreur lors de l\'ajout: ' + error.message;
+    }
+  }
+
+  async handleDeleteAttachment(attachmentId) {
+    const section = document.querySelector('.attachments-section');
+    const errorEl = section?.querySelector('.attachment-error');
+    try {
+      await apiService.deleteAttachment(attachmentId);
+      stateManager.deleteAttachment(attachmentId);
+    } catch (error) {
+      if (errorEl) {
+        errorEl.textContent = 'Erreur lors de la suppression: ' + error.message;
+      }
+    }
+  }
+
+  getAttachmentEntityType(type) {
+    switch(type) {
+      case 'project':
+        return 'projects';
+      case 'globalObjective':
+        return 'global_objectives';
+      case 'specificObjective':
+        return 'specific_objectives';
+      case 'task':
+        return 'tasks';
+      default:
+        return null;
+    }
   }
 
   renderTextBlock(title, content) {
