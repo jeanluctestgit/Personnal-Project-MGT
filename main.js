@@ -477,7 +477,7 @@ class App {
             <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">${title}</p>
             <h2 style="margin: 4px 0 0;">${item.name || 'Sans titre'}</h2>
           </div>
-          ${item.status ? `<span class="status-badge" style="background-color: var(--bg-secondary); color: var(--text-secondary);">${this.formatStatus(item.status)}</span>` : ''}
+          ${item.status ? `<span class="status-badge ${this.getStatusClass(item.status)}">${this.formatStatus(item.status)}</span>` : ''}
         </div>
         ${hasSections ? sections.join('') : '<p style="color: var(--text-secondary); font-size: 0.875rem;">Aucun detail disponible pour cet element.</p>'}
         ${attachments}
@@ -838,12 +838,17 @@ class App {
     }
   }
 
+  getStatusClass(status) {
+    if (!status) return '';
+    return `status-${status.replace('_', '-')}`;
+  }
+
   formatStatus(status) {
     const labels = {
-      not_started: 'Non demarre',
+      not_started: 'À faire',
       in_progress: 'En cours',
-      completed: 'Termine',
-      blocked: 'Bloque'
+      completed: 'Terminé',
+      blocked: 'Bloqué'
     };
 
     return labels[status] || status || 'Non defini';

@@ -64,6 +64,15 @@ export class TaskModal {
                 <option value="subproject" ${taskType === 'subproject' ? 'selected' : ''}>Sous Projet</option>
               </select>
             </div>
+            <div class="form-group">
+              <label>Statut *</label>
+              <select id="task-status">
+                <option value="not_started" ${status === 'not_started' ? 'selected' : ''}>À faire</option>
+                <option value="in_progress" ${status === 'in_progress' ? 'selected' : ''}>En cours</option>
+                <option value="completed" ${status === 'completed' ? 'selected' : ''}>Terminé</option>
+                <option value="blocked" ${status === 'blocked' ? 'selected' : ''}>Bloqué</option>
+              </select>
+            </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
               <div class="form-group">
                 <label>Date Debut</label>

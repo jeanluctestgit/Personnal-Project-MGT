@@ -164,6 +164,8 @@ export class KanbanBoard {
           <h4 class="card-title">${item.name || item.title || 'Sans titre'}</h4>
           ${item.description ? `<p class="card-description">${this.truncate(item.description, 80)}</p>` : ''}
 
+          ${this.renderStatusBadge(item.status)}
+
           ${hasAssignments ? `
             <div class="card-assignments">
               ${assignments.slice(0, 3).map(a => `
@@ -275,6 +277,27 @@ export class KanbanBoard {
       critical: 'Critique'
     };
     return labels[priority] || priority;
+  }
+
+  getStatusLabel(status) {
+    const labels = {
+      not_started: 'À faire',
+      in_progress: 'En cours',
+      completed: 'Terminé',
+      blocked: 'Bloqué'
+    };
+    return labels[status] || '';
+  }
+
+  getStatusClass(status) {
+    if (!status) return '';
+    return `status-${status.replace('_', '-')}`;
+  }
+
+  renderStatusBadge(status) {
+    const label = this.getStatusLabel(status);
+    if (!label) return '';
+    return `<span class="status-badge ${this.getStatusClass(status)}">${label}</span>`;
   }
 
   formatDate(dateString) {
