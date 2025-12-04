@@ -1,7 +1,6 @@
 import './style.css';
 import { stateManager } from './lib/state-manager.js';
 import { apiService } from './lib/api-service.js';
-import { supabase } from './lib/supabase-client.js';
 import { ProjectTree } from './components/project-tree.js';
 import { ListPanel } from './components/list-panel.js';
 import { KanbanBoard } from './components/kanban-board.js';
@@ -15,6 +14,8 @@ class App {
     this.currentUser = null;
     this.currentView = 'tree';
     this.components = {};
+
+    this.generateId = this.generateId.bind(this);
 
     this.init();
   }
@@ -31,32 +32,16 @@ class App {
 
     authBtn.addEventListener('click', async () => {
       if (this.currentUser) {
-        await supabase.auth.signOut();
+        this.handleLogout();
       } else {
         this.showAuthModal();
       }
     });
-
-    supabase.auth.onAuthStateChange((_event, session) => {
-      (() => {
-        this.currentUser = session?.user || null;
-        stateManager.setState({ currentUser: this.currentUser });
-        this.updateAuthButton();
-        if (this.currentUser) {
-          this.loadInitialData();
-        } else {
-          stateManager.updateProjects([]);
-          stateManager.updateGlobalObjectives([]);
-          stateManager.updateSpecificObjectives([]);
-          stateManager.updateTasks([]);
-        }
-      })();
-    });
   }
 
   async checkAuth() {
-    const { data: { user } } = await supabase.auth.getUser();
-    this.currentUser = user;
+    const storedUser = localStorage.getItem('ppm_local_user');
+    this.currentUser = storedUser ? JSON.parse(storedUser) : null;
     stateManager.setState({ currentUser: this.currentUser });
     this.updateAuthButton();
 
@@ -68,6 +53,17 @@ class App {
   updateAuthButton() {
     const authBtn = document.getElementById('auth-btn');
     authBtn.textContent = this.currentUser ? 'Deconnexion' : 'Connexion';
+  }
+
+  handleLogout() {
+    this.currentUser = null;
+    localStorage.removeItem('ppm_local_user');
+    stateManager.setState({ currentUser: null });
+    stateManager.updateProjects([]);
+    stateManager.updateGlobalObjectives([]);
+    stateManager.updateSpecificObjectives([]);
+    stateManager.updateTasks([]);
+    this.updateAuthButton();
   }
 
   showAuthModal() {
@@ -124,11 +120,23 @@ class App {
     const errorDiv = document.getElementById('auth-error');
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      if (!email || !password) {
+        throw new Error('Email et mot de passe requis');
+      }
 
-      document.getElementById('modal-container').style.display = 'none';
-      document.getElementById('modal-container').innerHTML = '';
+      this.currentUser = {
+        id: this.generateId('user'),
+        email
+      };
+
+      localStorage.setItem('ppm_local_user', JSON.stringify(this.currentUser));
+      stateManager.setState({ currentUser: this.currentUser });
+      await this.loadInitialData();
+      this.updateAuthButton();
+
+      const modalContainer = document.getElementById('modal-container');
+      modalContainer.style.display = 'none';
+      modalContainer.innerHTML = '';
     } catch (error) {
       errorDiv.textContent = error.message;
     }
@@ -140,15 +148,31 @@ class App {
     const errorDiv = document.getElementById('auth-error');
 
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
+      if (!email || !password) {
+        throw new Error('Email et mot de passe requis');
+      }
 
-      document.getElementById('modal-container').style.display = 'none';
-      document.getElementById('modal-container').innerHTML = '';
+      this.currentUser = {
+        id: this.generateId('user'),
+        email
+      };
+
+      localStorage.setItem('ppm_local_user', JSON.stringify(this.currentUser));
+      stateManager.setState({ currentUser: this.currentUser });
+      await this.loadInitialData();
+      this.updateAuthButton();
+
+      const modalContainer = document.getElementById('modal-container');
+      modalContainer.style.display = 'none';
+      modalContainer.innerHTML = '';
       alert('Compte cree avec succes!');
     } catch (error) {
       errorDiv.textContent = error.message;
     }
+  }
+
+  generateId(prefix) {
+    return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   }
 
   setupNavigation() {
