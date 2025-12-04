@@ -16,7 +16,10 @@ export class TaskModal {
     if (this.isEdit && this.task) {
       try {
         this.assignments = await apiService.getTaskAssignments(this.task.id);
-        const projectId = this.task.root_project_id;
+
+        const selectedProjectId = this.stateManager.getState('selectedProject')?.id;
+        const projectId = this.task.root_project_id || this.task.project_id || selectedProjectId;
+
         if (projectId) {
           this.projectResources = await apiService.getResourcesByProject(projectId);
         }
