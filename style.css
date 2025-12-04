@@ -1249,6 +1249,32 @@ button:disabled {
   gap: var(--spacing-md);
 }
 
+.chart-canvas-container {
+  position: relative;
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kpi-chart-card canvas {
+  width: 100% !important;
+  height: 280px !important;
+}
+
+.chart-placeholder {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-lg);
+  width: 100%;
+  height: 100%;
+  text-align: center;
+}
+
 .chart-bar-row {
   display: grid;
   grid-template-columns: 100px 1fr 50px;
