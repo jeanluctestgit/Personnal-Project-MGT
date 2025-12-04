@@ -274,6 +274,9 @@ export class ListPanel {
           this.stateManager.deleteTask(item.id);
           break;
       }
+
+      const attachments = await apiService.fetchAllAttachments();
+      this.stateManager.updateAttachments(attachments);
     } catch (error) {
       alert('Erreur lors de la suppression: ' + error.message);
     }
