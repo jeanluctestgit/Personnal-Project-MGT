@@ -241,6 +241,15 @@ export class GanttChart {
 
         bar.addEventListener('mousedown', (e) => this.handleBarMouseDown(e, item));
       }
+
+      const labelRow = sidebar.querySelector(`[data-item-id="${item.id}"]`);
+      if (labelRow) {
+        labelRow.addEventListener('click', () => {
+          if (this.onItemClick) {
+            this.onItemClick(item);
+          }
+        });
+      }
     });
 
     document.addEventListener('mousemove', (e) => this.handleMouseMove(e, startDate, endDate));
