@@ -1,4 +1,3 @@
-import './style.css';
 import { stateManager } from './lib/state-manager.js';
 import { apiService } from './lib/api-service.js';
 import { ProjectTree } from './components/project-tree.js';
