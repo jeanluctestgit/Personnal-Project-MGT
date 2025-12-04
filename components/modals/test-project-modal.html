@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test - Project Modal Component</title>
+  <link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+  <div style="padding: 20px;">
+    <h1>Test - Project Modal Component</h1>
+    <p>Cliquez sur les boutons ci-dessous pour tester les modals :</p>
+    <div style="display: flex; gap: 16px; margin-top: 16px;">
+      <button class="btn-primary" id="new-project-btn">Nouveau Projet</button>
+      <button class="btn-secondary" id="edit-project-btn">Editer Projet</button>
+    </div>
+  </div>
+
+  <div id="modal-container"></div>
+
+  <script type="module">
+    import { stateManager } from '../../lib/state-manager.js';
+    import { ProjectModal } from './project-modal.js';
+
+    const mockProject = {
+      id: '1',
+      name: 'Projet Test',
+      description: 'Description du projet test',
+      business_context: 'Contexte metier du projet',
+      target_audience: 'Public cible'
+    };
+
+    document.getElementById('new-project-btn').addEventListener('click', () => {
+      new ProjectModal(stateManager, null);
+    });
+
+    document.getElementById('edit-project-btn').addEventListener('click', () => {
+      new ProjectModal(stateManager, mockProject);
+    });
+  </script>
+</body>
+</html>

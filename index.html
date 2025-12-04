@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gestion de Projet</title>
+    <link rel="stylesheet" href="/style.css" />
+    <meta property="og:image" content="https://bolt.new/static/og_default.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
+</head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <h1>Gestion de Projet</h1>
+        <nav class="main-nav">
+          <button class="nav-btn" data-view="tree">Arborescence</button>
+          <button class="nav-btn" data-view="kanban">Kanban</button>
+          <button class="nav-btn" data-view="gantt">Gantt</button>
+          <button class="nav-btn" data-view="calendar">Calendrier</button>
+          <button class="nav-btn" data-view="hr">Ressources Humaines</button>
+          <button class="nav-btn" data-view="kpi">KPI</button>
+        </nav>
+        <div class="user-section">
+          <button id="auth-btn">Connexion</button>
+        </div>
+      </header>
+
+      <div class="app-container">
+        <aside class="sidebar-left" id="tree-sidebar">
+          <div id="project-tree"></div>
+        </aside>
+
+        <main class="main-content">
+          <div id="list-panel"></div>
+          <div id="view-container"></div>
+        </main>
+      </div>
+    </div>
+
+    <div id="modal-container"></div>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

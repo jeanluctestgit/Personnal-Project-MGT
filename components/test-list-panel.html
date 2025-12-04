@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test - List Panel Component</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <div style="padding: 20px;">
+    <h1>Test - List Panel Component</h1>
+    <div style="max-width: 400px; border: 1px solid var(--border-color); border-radius: var(--border-radius-lg); background: var(--bg-primary);">
+      <div id="list-panel"></div>
+    </div>
+  </div>
+
+  <div id="modal-container"></div>
+
+  <script type="module">
+    import { stateManager } from '../lib/state-manager.js';
+    import { ListPanel } from './list-panel.js';
+
+    const mockProjects = [
+      { id: '1', name: 'Projet Test 1', description: 'Description du projet 1' },
+      { id: '2', name: 'Projet Test 2', description: 'Description du projet 2' }
+    ];
+
+    const mockGlobalObjectives = [
+      { id: 'g1', project_id: '1', name: 'Objectif Global 1', description: 'Description objectif global 1' },
+      { id: 'g2', project_id: '1', name: 'Objectif Global 2', description: 'Description objectif global 2' }
+    ];
+
+    stateManager.updateProjects(mockProjects);
+    stateManager.updateGlobalObjectives(mockGlobalObjectives);
+
+    const container = document.getElementById('list-panel');
+    new ListPanel(container, stateManager);
+  </script>
+</body>
+</html>

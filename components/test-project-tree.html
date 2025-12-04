@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test - Project Tree Component</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <div style="padding: 20px;">
+    <h1>Test - Project Tree Component</h1>
+    <div style="max-width: 400px; border: 1px solid var(--border-color); border-radius: var(--border-radius-lg); padding: 16px; background: var(--bg-primary);">
+      <div id="project-tree"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { stateManager } from '../lib/state-manager.js';
+    import { ProjectTree } from './project-tree.js';
+
+    const mockProjects = [
+      { id: '1', name: 'Projet Test 1', description: 'Description du projet 1' },
+      { id: '2', name: 'Projet Test 2', description: 'Description du projet 2' }
+    ];
+
+    const mockGlobalObjectives = [
+      { id: 'g1', project_id: '1', name: 'Objectif Global 1', description: 'Description' },
+      { id: 'g2', project_id: '1', name: 'Objectif Global 2', description: 'Description' }
+    ];
+
+    const mockSpecificObjectives = [
+      { id: 's1', global_objective_id: 'g1', name: 'Objectif Specifique 1', description: 'Description' },
+      { id: 's2', global_objective_id: 'g1', name: 'Objectif Specifique 2', description: 'Description' }
+    ];
+
+    const mockTasks = [
+      { id: 't1', specific_objective_id: 's1', name: 'Tache 1', type: 'task', description: 'Description' },
+      { id: 't2', specific_objective_id: 's1', name: 'Sous-projet 1', type: 'subproject', description: 'Description' }
+    ];
+
+    stateManager.updateProjects(mockProjects);
+    stateManager.updateGlobalObjectives(mockGlobalObjectives);
+    stateManager.updateSpecificObjectives(mockSpecificObjectives);
+    stateManager.updateTasks(mockTasks);
+
+    const container = document.getElementById('project-tree');
+    new ProjectTree(container, stateManager);
+  </script>
+</body>
+</html>

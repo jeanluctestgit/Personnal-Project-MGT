@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test - Task Modal Component</title>
+  <link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+  <div style="padding: 20px;">
+    <h1>Test - Task Modal Component</h1>
+    <p>Cliquez sur les boutons ci-dessous pour tester les modals :</p>
+    <div style="display: flex; gap: 16px; margin-top: 16px;">
+      <button class="btn-primary" id="new-task-btn">Nouvelle Tache</button>
+      <button class="btn-secondary" id="edit-task-btn">Editer Tache</button>
+    </div>
+  </div>
+
+  <div id="modal-container"></div>
+
+  <script type="module">
+    import { stateManager } from '../../lib/state-manager.js';
+    import { TaskModal } from './task-modal.js';
+
+    const mockHRResources = [
+      { id: 'hr1', first_name: 'Jean', last_name: 'Dupont' },
+      { id: 'hr2', first_name: 'Marie', last_name: 'Martin' }
+    ];
+
+    const mockTask = {
+      id: 't1',
+      specific_objective_id: 's1',
+      name: 'Tache Test',
+      description: 'Description de la tache',
+      context: 'Contexte de la tache',
+      type: 'task',
+      start_date: '2025-01-01',
+      end_date: '2025-01-15',
+      duration: 15,
+      priority: 5,
+      completion_percentage: 50,
+      assigned_to: 'hr1'
+    };
+
+    stateManager.updateHRResources(mockHRResources);
+
+    document.getElementById('new-task-btn').addEventListener('click', () => {
+      new TaskModal(stateManager, null, 's1');
+    });
+
+    document.getElementById('edit-task-btn').addEventListener('click', () => {
+      new TaskModal(stateManager, mockTask, 's1');
+    });
+  </script>
+</body>
+</html>
