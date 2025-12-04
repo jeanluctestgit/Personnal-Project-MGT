@@ -90,6 +90,7 @@ class App {
           </div>
           <div class="modal-footer">
             <button class="btn-secondary modal-close">Annuler</button>
+            <button class="btn-secondary" id="auth-demo">Connexion démo</button>
             <button class="btn-secondary" id="auth-register">Inscription</button>
             <button class="btn-primary" id="auth-login">Connexion</button>
           </div>
@@ -107,12 +108,34 @@ class App {
 
     document.getElementById('auth-login').addEventListener('click', () => this.handleLogin());
     document.getElementById('auth-register').addEventListener('click', () => this.handleRegister());
+    document.getElementById('auth-demo').addEventListener('click', () => this.handleDemoLogin());
 
     document.getElementById('auth-password').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         this.handleLogin();
       }
     });
+  }
+
+  async handleDemoLogin() {
+    const errorDiv = document.getElementById('auth-error');
+
+    try {
+      const { email, password } = apiService.getDemoCredentials();
+      const user = await apiService.authenticateUser(email, password);
+
+      this.currentUser = user;
+      localStorage.setItem('ppm_local_user', JSON.stringify(this.currentUser));
+      stateManager.setState({ currentUser: this.currentUser });
+      await this.loadInitialData();
+      this.updateAuthButton();
+
+      const modalContainer = document.getElementById('modal-container');
+      modalContainer.style.display = 'none';
+      modalContainer.innerHTML = '';
+    } catch (error) {
+      errorDiv.textContent = error.message;
+    }
   }
 
   async handleLogin() {
