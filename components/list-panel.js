@@ -175,7 +175,10 @@ export class ListPanel {
     const itemInfo = document.createElement('div');
     itemInfo.style.flex = '1';
     itemInfo.innerHTML = `
-      <div style="font-weight: 500; margin-bottom: 4px;">${item.name}</div>
+      <div style="font-weight: 500; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+        <span>${item.name}</span>
+        ${this.renderStatusBadge(item.status)}
+      </div>
       ${item.description ? `<div style="font-size: 0.75rem; color: var(--text-secondary);">${item.description.substring(0, 60)}${item.description.length > 60 ? '...' : ''}</div>` : ''}
     `;
 
@@ -201,6 +204,28 @@ export class ListPanel {
     });
 
     return itemEl;
+  }
+
+  getStatusLabel(status) {
+    const labels = {
+      not_started: 'À faire',
+      in_progress: 'En cours',
+      completed: 'Terminé',
+      blocked: 'Bloqué'
+    };
+    return labels[status] || '';
+  }
+
+  getStatusClass(status) {
+    if (!status) return '';
+    return `status-${status.replace('_', '-')}`;
+  }
+
+  renderStatusBadge(status) {
+    if (!status) return '';
+    const label = this.getStatusLabel(status);
+    if (!label) return '';
+    return `<span class="status-badge ${this.getStatusClass(status)}">${label}</span>`;
   }
 
   handleAdd() {
