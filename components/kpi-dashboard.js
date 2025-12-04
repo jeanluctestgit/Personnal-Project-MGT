@@ -131,12 +131,16 @@ export class KPIDashboard {
       totalDays = Math.ceil((latestEnd - earliestStart) / (1000 * 60 * 60 * 24));
     }
 
+    const resourceRates = new Map(
+      resources.map(resource => [resource.id, resource.hourly_rate || 0])
+    );
+
     const totalCost = allTasks.reduce((sum, task) => {
       const assignments = task.task_assignments || [];
       const taskCost = assignments.reduce((taskSum, assignment) => {
         const resource = assignment.resources;
         const hours = assignment.allocated_hours || 0;
-        const rate = resource?.hourly_rate || 0;
+        const rate = resource?.hourly_rate || resourceRates.get(assignment.resource_id) || 0;
         return taskSum + (hours * rate);
       }, 0);
       return sum + taskCost;
@@ -484,6 +488,26 @@ export class KPIDashboard {
     ctx.lineTo(padding, height - padding / 1.5);
     ctx.lineTo(width - padding / 2, height - padding / 1.5);
     ctx.stroke();
+
+    const ticks = 4;
+    const step = Math.max(1, Math.ceil(maxValue / ticks));
+
+    ctx.fillStyle = '#475569';
+    ctx.font = '12px Inter, system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+
+    for (let i = 0; i <= ticks; i++) {
+      const value = step * i;
+      const yPos = height - padding / 1.5 - (value / Math.max(step * ticks, 1)) * chartHeight;
+
+      ctx.beginPath();
+      ctx.moveTo(padding - 6, yPos);
+      ctx.lineTo(width - padding / 2, yPos);
+      ctx.strokeStyle = i === 0 ? '#0ea5e9' : '#e2e8f0';
+      ctx.stroke();
+
+      ctx.fillText(`${value}h`, padding - 10, yPos + 4);
+    }
 
     labels.forEach((label, index) => {
       const xBase = padding + index * (barWidth * 2.2);

@@ -8,12 +8,16 @@ import { GanttChart } from './components/gantt-chart.js';
 import { CalendarView } from './components/calendar-view.js';
 import { ResourcesPanel } from './components/resources-panel.js';
 import { KPIDashboard } from './components/kpi-dashboard.js';
+import { TaskModal } from './components/modals/task-modal.js';
+import { GlobalObjectiveModal } from './components/modals/global-objective-modal.js';
+import { SpecificObjectiveModal } from './components/modals/specific-objective-modal.js';
 
 class App {
   constructor() {
     this.currentUser = null;
     this.currentView = 'tree';
     this.components = {};
+    this.stateManager = stateManager;
 
     this.generateId = this.generateId.bind(this);
 
@@ -54,6 +58,25 @@ class App {
   updateAuthButton() {
     const authBtn = document.getElementById('auth-btn');
     authBtn.textContent = this.currentUser ? 'Deconnexion' : 'Connexion';
+  }
+
+  openItemModal(item, entityType) {
+    if (!this.currentUser) {
+      this.showAuthModal();
+      return;
+    }
+
+    switch (entityType) {
+      case 'global_objectives':
+        new GlobalObjectiveModal(this.stateManager, item, item.project_id, item.subproject_id);
+        break;
+      case 'specific_objectives':
+        new SpecificObjectiveModal(this.stateManager, item, item.global_objective_id);
+        break;
+      case 'tasks':
+      default:
+        new TaskModal(this.stateManager, item, item.specific_objective_id);
+    }
   }
 
   handleLogout() {
@@ -225,21 +248,21 @@ class App {
       entityType: 'tasks',
       fetchMethod: apiService.fetchTasks.bind(apiService),
       updateMethod: apiService.updateTask.bind(apiService),
-      onItemClick: null
+      onItemClick: (item) => this.openItemModal(item, 'tasks')
     });
 
     this.components.ganttTasks = new GanttChart({
       entityType: 'tasks',
       fetchMethod: apiService.fetchTasks.bind(apiService),
       updateMethod: apiService.updateTask.bind(apiService),
-      onItemClick: null
+      onItemClick: (item) => this.openItemModal(item, 'tasks')
     });
 
     this.components.calendarTasks = new CalendarView({
       entityType: 'tasks',
       fetchMethod: apiService.fetchTasks.bind(apiService),
       updateMethod: apiService.updateTask.bind(apiService),
-      onItemClick: null
+      onItemClick: (item) => this.openItemModal(item, 'tasks')
     });
 
     this.components.resourcesPanel = new ResourcesPanel();
