@@ -212,14 +212,9 @@ export class CalendarView {
   }
 
   renderCalendarItem(item, isWeekView = false) {
-    const priorityColors = {
-      low: '#10b981',
-      medium: '#f59e0b',
-      high: '#ef4444',
-      critical: '#dc2626'
-    };
-
-    const color = priorityColors[item.priority] || '#2563eb';
+    const color = this.getPriorityColor(item);
+    const title = this.getItemLabel(item);
+    const progress = this.getProgressValue(item);
 
     return `
       <div
@@ -228,8 +223,8 @@ export class CalendarView {
         draggable="true"
         style="border-left: 3px solid ${color};"
       >
-        <span class="item-title">${item.title}</span>
-        ${item.progress !== undefined ? `<span class="item-progress">${item.progress}%</span>` : ''}
+        <span class="item-title">${title}</span>
+        <span class="item-progress">${progress}%</span>
       </div>
     `;
   }
@@ -327,5 +322,63 @@ export class CalendarView {
       'tasks': 'Tâches'
     };
     return labels[this.entityType] || 'Items';
+  }
+
+  getItemLabel(item) {
+    if (this.entityType === 'tasks') {
+      return item.name || item.title || 'Sans titre';
+    }
+
+    if (this.entityType === 'global_objectives' || this.entityType === 'specific_objectives') {
+      return item.name || item.title || 'Sans titre';
+    }
+
+    return item.title || item.name || 'Sans titre';
+  }
+
+  getProgressValue(item) {
+    if (typeof item.progress === 'number') return Math.round(item.progress);
+    if (typeof item.completion_percentage === 'number') return Math.round(item.completion_percentage);
+    if (typeof item.completion === 'number') return Math.round(item.completion);
+    return 0;
+  }
+
+  getPriorityKey(item) {
+    const priority = item?.priority;
+    const priorityMap = {
+      1: 'low',
+      2: 'medium',
+      3: 'high',
+      4: 'critical'
+    };
+
+    if (typeof priority === 'number') {
+      return priorityMap[priority] || 'medium';
+    }
+
+    if (typeof priority === 'string') {
+      const numeric = parseInt(priority, 10);
+      if (!isNaN(numeric)) {
+        return priorityMap[numeric] || 'medium';
+      }
+
+      const normalized = priority.toLowerCase();
+      if (['low', 'medium', 'high', 'critical'].includes(normalized)) {
+        return normalized;
+      }
+    }
+
+    return 'medium';
+  }
+
+  getPriorityColor(item) {
+    const priorityColors = {
+      low: '#10b981',
+      medium: '#f59e0b',
+      high: '#ef4444',
+      critical: '#dc2626'
+    };
+
+    return priorityColors[this.getPriorityKey(item)] || '#2563eb';
   }
 }

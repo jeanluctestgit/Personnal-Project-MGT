@@ -1,4 +1,4 @@
-import { apiService } from '../lib/api-service.js';
+import { stateManager } from '../lib/state-manager.js';
 
 export class GanttChart {
   constructor(config) {
@@ -36,11 +36,19 @@ export class GanttChart {
             </select>
           </div>
         </div>
-        <div class="gantt-body">
-          <div class="gantt-sidebar" id="ganttSidebar">
-            <div class="sidebar-header">Tâches</div>
+          <div class="gantt-body">
+            <div class="gantt-sidebar" id="ganttSidebar">
+            <div class="sidebar-header">
+              <div class="sidebar-period"></div>
+              <div class="sidebar-columns">
+                <div class="sidebar-col sidebar-col-title">Élément</div>
+                <div class="sidebar-col sidebar-col-resource">Ressource RH</div>
+                <div class="sidebar-col sidebar-col-priority">Priorité</div>
+                <div class="sidebar-col sidebar-col-duration">Durée</div>
+              </div>
+            </div>
             <div class="sidebar-content"></div>
-          </div>
+            </div>
           <div class="gantt-timeline-container">
             <div class="gantt-timeline-header" id="ganttTimelineHeader"></div>
             <div class="gantt-timeline-body" id="ganttTimelineBody"></div>
@@ -159,7 +167,7 @@ export class GanttChart {
     const header = document.getElementById('ganttTimelineHeader');
     if (!header) return;
 
-    const sidebarHeader = document.querySelector('.sidebar-header');
+    const sidebarHeader = document.querySelector('.sidebar-period');
     const periodLabel = this.getPeriodLabel();
 
     if (sidebarHeader) {
@@ -197,11 +205,26 @@ export class GanttChart {
       return;
     }
 
-    sidebar.innerHTML = this.items.map(item => `
-      <div class="gantt-row-label" data-item-id="${item.id}">
-        <span class="row-title">${item.title}</span>
-      </div>
-    `).join('');
+    sidebar.innerHTML = this.items.map(item => {
+      const progress = this.getProgressValue(item);
+      const priorityKey = this.getPriorityKey(item);
+      const priorityLabel = this.getPriorityLabel(priorityKey);
+      const resourceName = this.getAssignedResourceName(item);
+
+      return `
+        <div class="gantt-row-label" data-item-id="${item.id}">
+          <div class="row-title">
+            <span class="row-name">${this.getItemLabel(item)}</span>
+            <span class="row-progress">${progress}%</span>
+          </div>
+          <div class="row-resource" title="${resourceName}">${resourceName}</div>
+          <div class="row-priority">
+            <span class="priority-badge priority-${priorityKey}">${priorityLabel}</span>
+          </div>
+          <div class="row-duration">${this.getDurationLabel(item)}</div>
+        </div>
+      `;
+    }).join('');
 
     timelineBody.innerHTML = this.items.map(item =>
       this.renderGanttBar(item, startDate, endDate)
@@ -242,8 +265,10 @@ export class GanttChart {
       critical: '#dc2626'
     };
 
-    const color = priorityColors[item.priority] || '#2563eb';
-    const progress = item.progress || 0;
+    const priorityKey = this.getPriorityKey(item);
+    const color = priorityColors[priorityKey] || '#2563eb';
+    const progress = this.getProgressValue(item);
+    const label = `${this.getItemLabel(item)} · ${progress}%`;
 
     return `
       <div class="gantt-row">
@@ -254,7 +279,7 @@ export class GanttChart {
             style="left: ${leftPercent}%; width: ${widthPercent}%; background-color: ${color};"
           >
             <div class="gantt-bar-progress" style="width: ${progress}%"></div>
-            <span class="gantt-bar-label">${item.title}</span>
+            <span class="gantt-bar-label">${label}</span>
             <div class="gantt-bar-resize-left"></div>
             <div class="gantt-bar-resize-right"></div>
           </div>
@@ -375,5 +400,97 @@ export class GanttChart {
       'tasks': 'Tâches'
     };
     return labels[this.entityType] || 'Items';
+  }
+
+  getItemLabel(item) {
+    if (this.entityType === 'tasks') {
+      return item.name || item.title || 'Sans titre';
+    }
+
+    if (this.entityType === 'global_objectives' || this.entityType === 'specific_objectives') {
+      return item.name || item.title || 'Sans titre';
+    }
+
+    return item.title || item.name || 'Sans titre';
+  }
+
+  getProgressValue(item) {
+    if (typeof item.progress === 'number') return Math.round(item.progress);
+    if (typeof item.completion_percentage === 'number') return Math.round(item.completion_percentage);
+    if (typeof item.completion === 'number') return Math.round(item.completion);
+    return 0;
+  }
+
+  getPriorityKey(item) {
+    const priority = item?.priority;
+    const priorityMap = {
+      1: 'low',
+      2: 'medium',
+      3: 'high',
+      4: 'critical'
+    };
+
+    if (typeof priority === 'number') {
+      return priorityMap[priority] || 'medium';
+    }
+
+    if (typeof priority === 'string') {
+      const numeric = parseInt(priority, 10);
+      if (!isNaN(numeric)) {
+        return priorityMap[numeric] || 'medium';
+      }
+
+      const normalized = priority.toLowerCase();
+      if (['low', 'medium', 'high', 'critical'].includes(normalized)) {
+        return normalized;
+      }
+    }
+
+    return 'medium';
+  }
+
+  getPriorityLabel(priorityKey) {
+    const labels = {
+      low: 'Basse',
+      medium: 'Moyenne',
+      high: 'Haute',
+      critical: 'Critique'
+    };
+
+    return labels[priorityKey] || 'Moyenne';
+  }
+
+  getAssignedResourceName(item) {
+    if (item.task_assignments?.length) {
+      const resource = item.task_assignments[0]?.resources;
+      if (resource) {
+        return resource.name || [resource.first_name, resource.last_name].filter(Boolean).join(' ').trim();
+      }
+    }
+
+    const hrResources = stateManager.getState('hrResources') || [];
+    const assigned = hrResources.find(res => res.id === item.assigned_to);
+
+    if (assigned) {
+      const fullName = [assigned.first_name, assigned.last_name].filter(Boolean).join(' ').trim();
+      return fullName || assigned.name || 'Non assigné';
+    }
+
+    return 'Non assigné';
+  }
+
+  getDurationLabel(item) {
+    if (item.duration) {
+      return `${item.duration} j`;
+    }
+
+    if (item.start_date && item.end_date) {
+      const start = new Date(item.start_date);
+      const end = new Date(item.end_date);
+      const diffDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1);
+      return `${diffDays} j`;
+    }
+
+    return '—';
   }
 }
